@@ -1,0 +1,9 @@
+- path: "/api/hello"
+  port: "8080"
+  querystring: ""
+  headers:
+    - "content-type=application/json"
+    - "custom=customValue"
+  response: "pickled cucumber"
+  dataPath: ""
+

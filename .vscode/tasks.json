@@ -1,0 +1,33 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "go run apic",
+            "command": "go run main.go",
+            "type": "shell",
+            "args": [],
+            "options": {
+                "cwd": "${workspaceFolder}/",
+                "env": {
+                    "env": "dev"
+                }
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "go build apic",
+            "command": "go build",
+            "type": "shell",
+            "args": [],
+            "options": {
+                "cwd": "${workspaceFolder}/",
+                "env": {
+                    "env": "dev"
+                }
+            },
+            "problemMatcher": []
+        }
+    ]
+}
