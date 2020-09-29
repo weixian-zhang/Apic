@@ -16,11 +16,15 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/apic/cmd/stdout"
 	"github.com/gorilla/mux"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 const defaultRestPath string = "api/new"
@@ -32,7 +36,8 @@ type apiCmd struct {
 	headerStr string
 	headers []header
 	resp string
-	dataPath string
+	configPath string
+	data string
 	auth apiAuth
 }
 
@@ -61,18 +66,14 @@ type response struct {
 	requArrivedAt time.Time
 }
 
-var api apiCmd = apiCmd{}
-var apis []apiCmd
-// var path string
-// var port string
-var configPath string
+type flagProp struct {
+	
+}
 
-// var singleApi api = api{
-// 	path: "api/new",
-// 	port: "8080",
-// 	data: "{}",
-// 	querystring: "",
-// }
+var defaultPort string = "8080"
+var apicmd = apiCmd{}
+//var port string = "8080"
+var configPath string
 
 // restCmd represents the rest command
 var restCmd = &cobra.Command{
@@ -88,87 +89,122 @@ func init() {
 
 	hostCmd.AddCommand(restCmd)
 
-	restCmd.Flags().StringVarP(&configPath, "config", "c", "", "config file to host series of APIs")
+	restCmd.PersistentFlags().StringP("config", "c", "", "config file to host series of APIs")
 
-	restCmd.Flags().StringVarP(&api.querystring, "querystring", "q", "", "query string")
+	restCmd.PersistentFlags().StringP("querystr", "q", "", "query string")
 	
-	restCmd.Flags().StringVarP(&api.port, "port", "p", "", "specify listening port, default:8080")
+	restCmd.PersistentFlags().StringP("port", "p", "", "specify listening port, default:8080")
 
-	restCmd.Flags().StringVarP(&api.headerStr, "header", "h", "", "headers space-delimited: content-type=application/json custom-key=customvalue")
+	restCmd.PersistentFlags().StringP("header", "d", "", "headers space-delimited: content-type=application/json custom-key=customvalue")
 	
-	restCmd.Flags().StringVarP(&api.resp, "resp", "r", "", "mock response (always json)")
-	
+	restCmd.PersistentFlags().StringP("resp", "r", "", "mock response (always json)")
 }
 
 func restCmdExecute(cmd *cobra.Command, args []string) {
 
-	
+	apis := readCmds(cmd)
 
-	//singleApi.path = path
- 
-	//fmt.Println(singleApi.path)
-
-	// if len(args) == 0 {
-	// 	createRest(defaultRestPath)
-	// } else {
-	// 	path := args[0]
-	// 	createRest(path)
-	// }
-
+	createRest(cmd, apis)
 }
 
-func createRest() {
-	r := mux.NewRouter()
+func readCmds(cmd *cobra.Command) ([]apiCmd) {
 
-	http.ListenAndServe(":80", r)
-}
-
-func createRestHandlers(r *mux.Router, path string) {
-	
-
-	r.HandleFunc(path, httpHandler).Methods("GET")
-	r.HandleFunc(path, httpHandler).Methods("POST")
-	r.HandleFunc(path, httpHandler).Methods("PUT")
-	r.HandleFunc(path, httpHandler).Methods("DELETE")
-}
-
-func httpHandler(w http.ResponseWriter, r *http.Request) {
-	
-}
-
-
-func httpResponse(w http.ResponseWriter, r *http.Request, api apiCmd, resp response) {
-
-}
-
-func readCmd(apis *[]apiCmd) {
-
-	exist := readConfig(apis)
+	apiCmds, exist := readConfigFileCmds(cmd)
 
 	if !exist {
-		readSingleCmd(apis)
+		return readCliCmd(cmd)
+	} else {
+		return apiCmds
 	}
 }
 
-func readSingleCmd(apis *[]apiCmd) {
-	
+func readCliCmd(cmd *cobra.Command) ([]apiCmd) {
+
+	apis := []apiCmd{}
+
+	apicmd := apiCmd{}
+	apicmd.path = cmd.Flags().Arg(0)
+
+	cmd.Flags().Visit(func(f *pflag.Flag) {
+
+		switch f.Name {
+			case "querystr":
+				apicmd.querystring = f.Value.String()
+			case "resp":
+				apicmd.resp = f.Value.String()
+		}
+	})
+
+	apis = append(apis, apicmd)
+
+	return apis
 }
 
-func readConfig(apis *[]apiCmd) (bool) {
+func readConfigFileCmds(cmd *cobra.Command) ([]apiCmd, bool) {
+
+	configPath, _ := cmd.Flags().GetString("config")
+	//TODO: log err
+	fmt.Println(configPath)
+
 	if configPath == "" {
-		return false
+		return nil, false
 	}
 
-	return true
+	return nil, true
 }
 
-func getPath(args []string) string {
+func createRest(cmd *cobra.Command, apiCmds []apiCmd) {
+
+	port := getPort(cmd)
+
+	if len(apiCmds) == 0 {
+		stdout.PInfo("cmd not found")
+	}
+
+	r := mux.NewRouter()
+
+	for _, v := range apiCmds {
+
+		createRestHandlers(r, v)
+	}
+
+	http.ListenAndServe(fmt.Sprintf(":%s", port), r)
+}
+
+func createRestHandlers(r *mux.Router, cmd apiCmd) {
+	
+	r.HandleFunc(cmd.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, cmd) }).Methods("GET")
+	
+	r.HandleFunc(cmd.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, cmd) }).Methods("POST")
+
+	r.HandleFunc(cmd.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, cmd) }).Methods("PUT")
+
+	r.HandleFunc(cmd.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, cmd) }).Methods("DELETE")
+}
+
+func handleResponse(w http.ResponseWriter, r *http.Request, api apiCmd) {
+	fmt.Println(api.resp)
+}
+
+
+func getApiPath(args []string) string {
 	if len(args) > 0 {
 		return args[0]
 	} else {
 		return "/api/new"
 	}
 }
+
+func getPort(cmd *cobra.Command) (string) {
+	var port string = defaultPort
+	p, _ := cmd.Flags().GetString("port")
+	if p != "" {
+		port = p
+	}
+	return strings.TrimSpace(port)
+}
+
+
 
 	// Here you will define your flags and configuration settings.
 

@@ -1,5 +1,5 @@
-- path: "/api/hello"
   port: "8080"
+- path: "/api/hello"
   querystring: ""
   headers:
     - "content-type=application/json"
