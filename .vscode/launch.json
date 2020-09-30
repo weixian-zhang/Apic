@@ -15,7 +15,7 @@
                 "env": "dev"
             },
             //"args": ["host", "rest"]
-            "args": ["host", "rest", "/api/order/new", "-r 'new order received'", "-q 'id=2&order=new'", "-p 8090"]
+            "args": ["host", "rest", "/api/order/new", "-r new order received", "-q id=2&order=new", "-p 8090"]
         },
     ]
 }

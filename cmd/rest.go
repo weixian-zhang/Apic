@@ -16,11 +16,14 @@ limitations under the License.
 package cmd
 
 import (
+	"io"
 	"fmt"
 	"net/http"
+	"net"
 	"strings"
 	"time"
-
+	"os"
+	"errors"
 	"github.com/apic/cmd/stdout"
 	"github.com/gorilla/mux"
 	"github.com/spf13/cobra"
@@ -29,14 +32,18 @@ import (
 
 const defaultRestPath string = "api/new"
 
+type cmdContext struct {
+	port string
+	configPath string
+	apiCmds []apiCmd
+}
+
 type apiCmd struct {
 	path string
-	port string
 	querystring string
 	headerStr string
 	headers []header
 	resp string
-	configPath string
 	data string
 	auth apiAuth
 }
@@ -56,18 +63,16 @@ type header struct {
 }
 
 type response struct {
+	srcIP string
 	hostName string
-	ip string
+	IP string
 	port string
 	path string
 	querystring string
 	headers []header
-	mockResp string
+	mockResp string //json data or string
+	swaggerPath string
 	requArrivedAt time.Time
-}
-
-type flagProp struct {
-	
 }
 
 var defaultPort string = "8080"
@@ -95,34 +100,41 @@ func init() {
 	
 	restCmd.PersistentFlags().StringP("port", "p", "", "specify listening port, default:8080")
 
-	restCmd.PersistentFlags().StringP("header", "d", "", "headers space-delimited: content-type=application/json custom-key=customvalue")
+	restCmd.PersistentFlags().StringP("header", "d", "", "i.e: content-type=application/json custom-key=customvalue")
 	
 	restCmd.PersistentFlags().StringP("resp", "r", "", "mock response (always json)")
 }
 
 func restCmdExecute(cmd *cobra.Command, args []string) {
 
-	apis := readCmds(cmd)
+	cmdContext := readCmds(cmd)
 
-	createRest(cmd, apis)
+	createRest(cmdContext)
 }
 
-func readCmds(cmd *cobra.Command) ([]apiCmd) {
+func readCmds(cmd *cobra.Command) (cmdContext) {
 
-	apiCmds, exist := readConfigFileCmds(cmd)
+	cmdContext := cmdContext{}
+	port := getPort(cmd)
 
-	if !exist {
-		return readCliCmd(cmd)
+	cmdContext.port = port
+	configPath, _ := cmd.Flags().GetString("config")
+	cmdContext.configPath = configPath
+
+	if configPath != "" {
+		cmdContext.apiCmds = readConfigFileCmds(configPath)
 	} else {
-		return apiCmds
+		cmdContext.apiCmds = readCliCmd(cmd)
 	}
+
+	return cmdContext
 }
 
 func readCliCmd(cmd *cobra.Command) ([]apiCmd) {
 
 	apis := []apiCmd{}
 
-	apicmd := apiCmd{}
+	apicmd := newAPICmd()
 	apicmd.path = cmd.Flags().Arg(0)
 
 	cmd.Flags().Visit(func(f *pflag.Flag) {
@@ -132,6 +144,9 @@ func readCliCmd(cmd *cobra.Command) ([]apiCmd) {
 				apicmd.querystring = f.Value.String()
 			case "resp":
 				apicmd.resp = f.Value.String()
+			case "header":
+				apicmd.headerStr = f.Value.String()
+				apicmd.headers = getHeaders(f.Value.String())
 		}
 	})
 
@@ -140,50 +155,81 @@ func readCliCmd(cmd *cobra.Command) ([]apiCmd) {
 	return apis
 }
 
-func readConfigFileCmds(cmd *cobra.Command) ([]apiCmd, bool) {
+func readConfigFileCmds(configPath string) ([]apiCmd) {
 
-	configPath, _ := cmd.Flags().GetString("config")
 	//TODO: log err
 	fmt.Println(configPath)
 
 	if configPath == "" {
-		return nil, false
+		return nil
 	}
 
-	return nil, true
+	return nil
 }
 
-func createRest(cmd *cobra.Command, apiCmds []apiCmd) {
+func createRest(cmdCon cmdContext) {
 
-	port := getPort(cmd)
-
-	if len(apiCmds) == 0 {
-		stdout.PInfo("cmd not found")
+	if len(cmdCon.apiCmds) == 0 {
+		stdout.Print("cmd not found")
 	}
 
 	r := mux.NewRouter()
 
-	for _, v := range apiCmds {
+	for _, v := range cmdCon.apiCmds {
 
-		createRestHandlers(r, v)
+		createRestHandlers(r, v, cmdCon)
 	}
 
-	http.ListenAndServe(fmt.Sprintf(":%s", port), r)
+	http.ListenAndServe(fmt.Sprintf(":%s", cmdCon.port), r)
 }
 
-func createRestHandlers(r *mux.Router, cmd apiCmd) {
+func createRestHandlers(r *mux.Router, cmd apiCmd, cmdCon cmdContext) {
 	
-	r.HandleFunc(cmd.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, cmd) }).Methods("GET")
+	r.HandleFunc(cmd.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, cmd, cmdCon) }).Methods("GET")
 	
-	r.HandleFunc(cmd.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, cmd) }).Methods("POST")
+	r.HandleFunc(cmd.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, cmd, cmdCon) }).Methods("POST")
 
-	r.HandleFunc(cmd.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, cmd) }).Methods("PUT")
+	r.HandleFunc(cmd.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, cmd, cmdCon) }).Methods("PUT")
 
-	r.HandleFunc(cmd.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, cmd) }).Methods("DELETE")
+	r.HandleFunc(cmd.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, cmd, cmdCon) }).Methods("DELETE")
 }
 
-func handleResponse(w http.ResponseWriter, r *http.Request, api apiCmd) {
-	fmt.Println(api.resp)
+func handleResponse(w http.ResponseWriter, r *http.Request, api apiCmd, cmdCon cmdContext) {
+	resp := createResponse(r, api, cmdCon)
+
+	for _, h := range resp.headers {
+		w.Header().Add(h.key, h.value)
+	}
+
+	io.WriteString(w, resp.mockResp)
+
+	stdout.Print(stdout.Cyan(resp.mockResp))
+}
+
+func createResponse(r *http.Request, api apiCmd, cmdCon cmdContext) (response) {
+	resp := response{}
+
+	resp.srcIP = r.RemoteAddr
+
+	host, _ := os.Hostname()
+	resp.hostName = host
+
+	resp.headers = api.headers
+
+	resp.path = api.path
+	resp.port = cmdCon.port
+
+	resp.querystring = strings.TrimSpace(api.querystring)
+	resp.mockResp = strings.TrimSpace(api.resp)
+	ip, err := getLocalIP()
+
+	if err == nil {
+		resp.IP = ip
+	}
+
+	resp.requArrivedAt = time.Now()
+
+	return resp
 }
 
 
@@ -195,6 +241,10 @@ func getApiPath(args []string) string {
 	}
 }
 
+func getHeaders(headerStr string) ([]header) {
+	return nil
+}
+
 func getPort(cmd *cobra.Command) (string) {
 	var port string = defaultPort
 	p, _ := cmd.Flags().GetString("port")
@@ -204,15 +254,48 @@ func getPort(cmd *cobra.Command) (string) {
 	return strings.TrimSpace(port)
 }
 
+func getLocalIP() (string, error) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 {
+			continue // interface down
+		}
+		if iface.Flags&net.FlagLoopback != 0 {
+			continue // loopback interface
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			return "", err
+		}
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if ip == nil || ip.IsLoopback() {
+				continue
+			}
+			ip = ip.To4()
+			if ip == nil {
+				continue // not an ipv4 address
+			}
+			return ip.String(), nil
+		}
+	}
+	return "", errors.New("are you connected to the network?")
+}
 
+func newAPICmd() (apiCmd) {
+	return apiCmd{
+		path: "/api/new",
+		resp: "mocked resp",
+	}
+}
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// restCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// restCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
