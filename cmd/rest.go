@@ -62,18 +62,29 @@ type header struct {
 	value string
 }
 
-type response struct {
-	srcIP string
-	hostName string
-	IP string
-	port string
-	path string
-	querystring string
-	headers []header
-	mockResp string //json data or string
-	swaggerPath string
-	requArrivedAt time.Time
+type cookie struct {
+	name string
+	value string
+	expiry time.Duration
 }
+
+type response struct {
+	resp string
+	header []header
+	cookie []cookie
+	// srcIP string
+	// hostName string
+	// IP string
+	// port string
+	// path string
+	// querystring string
+	// headers []header
+	// mockResp string //json data or string
+	// swaggerPath string
+	// requArrivedAt time.Time
+}
+
+
 
 var defaultPort string = "8080"
 var apicmd = apiCmd{}
@@ -221,7 +232,7 @@ func createResponse(r *http.Request, api apiCmd, cmdCon cmdContext) (response) {
 
 	resp.querystring = strings.TrimSpace(api.querystring)
 	resp.mockResp = strings.TrimSpace(api.resp)
-	ip, err := getLocalIP()
+	
 
 	if err == nil {
 		resp.IP = ip
