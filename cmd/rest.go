@@ -16,21 +16,19 @@ limitations under the License.
 package cmd
 
 import (
+	"os"
+	"bufio"
 	"io"
 	"fmt"
 	"net/http"
-	"net"
 	"strings"
 	"time"
-	"os"
-	"errors"
-	"github.com/apic/cmd/stdout"
 	"github.com/gorilla/mux"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
-const defaultRestPath string = "api/new"
+const defaultRestPath string = "/api/new"
 
 type cmdContext struct {
 	port string
@@ -43,6 +41,8 @@ type apiCmd struct {
 	querystring string
 	headerStr string
 	headers []header
+	cookieStr string
+	cookies []cookie
 	resp string
 	data string
 	auth apiAuth
@@ -70,8 +70,8 @@ type cookie struct {
 
 type response struct {
 	resp string
-	header []header
-	cookie []cookie
+	headers []header
+	cookies []cookie
 	// srcIP string
 	// hostName string
 	// IP string
@@ -105,13 +105,15 @@ func init() {
 
 	hostCmd.AddCommand(restCmd)
 
-	restCmd.PersistentFlags().StringP("config", "c", "", "config file to host series of APIs")
+	restCmd.PersistentFlags().StringP("config", "", "", "config file to host series of APIs")
 
 	restCmd.PersistentFlags().StringP("querystr", "q", "", "query string")
 	
 	restCmd.PersistentFlags().StringP("port", "p", "", "specify listening port, default:8080")
 
 	restCmd.PersistentFlags().StringP("header", "d", "", "i.e: content-type=application/json custom-key=customvalue")
+
+	restCmd.PersistentFlags().StringP("cookie", "k", "", "i.e: cookie1=value1 cookie2=value2")
 	
 	restCmd.PersistentFlags().StringP("resp", "r", "", "mock response (always json)")
 }
@@ -121,6 +123,12 @@ func restCmdExecute(cmd *cobra.Command, args []string) {
 	cmdContext := readCmds(cmd)
 
 	createRest(cmdContext)
+
+	printAPIsInfo(cmdContext)
+
+	reader := bufio.NewReader(os.Stdin)
+	_, _, err := reader.ReadRune()
+	fmt.Println(err.Error())
 }
 
 func readCmds(cmd *cobra.Command) (cmdContext) {
@@ -147,17 +155,25 @@ func readCliCmd(cmd *cobra.Command) ([]apiCmd) {
 
 	apicmd := newAPICmd()
 	apicmd.path = cmd.Flags().Arg(0)
+	if apicmd.path == "" {
+		apicmd.path = defaultRestPath
+	} else {
+		apicmd.path =  formatAPIPath(strings.TrimSpace(apicmd.path))
+	}
 
 	cmd.Flags().Visit(func(f *pflag.Flag) {
 
 		switch f.Name {
 			case "querystr":
-				apicmd.querystring = f.Value.String()
+				apicmd.querystring = strings.TrimSpace(f.Value.String())
 			case "resp":
 				apicmd.resp = f.Value.String()
 			case "header":
-				apicmd.headerStr = f.Value.String()
-				apicmd.headers = getHeaders(f.Value.String())
+				apicmd.headerStr = strings.TrimSpace(f.Value.String())
+				apicmd.headers = createHeaderSlice(apicmd.headerStr)
+			case "cookie":
+				apicmd.cookieStr = strings.TrimSpace(f.Value.String())
+				apicmd.cookies = createCookieSlice(apicmd.cookieStr)
 		}
 	})
 
@@ -180,67 +196,114 @@ func readConfigFileCmds(configPath string) ([]apiCmd) {
 
 func createRest(cmdCon cmdContext) {
 
-	if len(cmdCon.apiCmds) == 0 {
-		stdout.Print("cmd not found")
-	}
-
 	r := mux.NewRouter()
 
 	for _, v := range cmdCon.apiCmds {
 
-		createRestHandlers(r, v, cmdCon)
+		resp := createResponse(v)
+
+		createRestHandlers(r, v, resp)
 	}
 
-	http.ListenAndServe(fmt.Sprintf(":%s", cmdCon.port), r)
+	go http.ListenAndServe(fmt.Sprintf(":%s", cmdCon.port), r)
 }
 
-func createRestHandlers(r *mux.Router, cmd apiCmd, cmdCon cmdContext) {
+func createRestHandlers(r *mux.Router, api apiCmd, resp response ) { //cmd apiCmd, cmdCon cmdContext) {
 	
-	r.HandleFunc(cmd.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, cmd, cmdCon) }).Methods("GET")
+	r.HandleFunc(api.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, resp) }).Methods("GET")
 	
-	r.HandleFunc(cmd.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, cmd, cmdCon) }).Methods("POST")
+	r.HandleFunc(api.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, resp) }).Methods("POST")
 
-	r.HandleFunc(cmd.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, cmd, cmdCon) }).Methods("PUT")
+	r.HandleFunc(api.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, resp) }).Methods("PUT")
 
-	r.HandleFunc(cmd.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, cmd, cmdCon) }).Methods("DELETE")
+	r.HandleFunc(api.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, resp) }).Methods("DELETE")
 }
 
-func handleResponse(w http.ResponseWriter, r *http.Request, api apiCmd, cmdCon cmdContext) {
-	resp := createResponse(r, api, cmdCon)
+func handleResponse(w http.ResponseWriter, r *http.Request, resp response) { //} api apiCmd, cmdCon cmdContext) {
 
 	for _, h := range resp.headers {
 		w.Header().Add(h.key, h.value)
 	}
 
-	io.WriteString(w, resp.mockResp)
+	for _, c := range resp.cookies {
+		cookie := http.Cookie{
+			Name: c.name,
+			Value: c.value,
+		}
 
-	stdout.Print(stdout.Cyan(resp.mockResp))
-}
-
-func createResponse(r *http.Request, api apiCmd, cmdCon cmdContext) (response) {
-	resp := response{}
-
-	resp.srcIP = r.RemoteAddr
-
-	host, _ := os.Hostname()
-	resp.hostName = host
-
-	resp.headers = api.headers
-
-	resp.path = api.path
-	resp.port = cmdCon.port
-
-	resp.querystring = strings.TrimSpace(api.querystring)
-	resp.mockResp = strings.TrimSpace(api.resp)
-	
-
-	if err == nil {
-		resp.IP = ip
+		http.SetCookie(w,&cookie)
 	}
 
-	resp.requArrivedAt = time.Now()
+	newResp := fmt.Sprintf(`%v:
+%v`,  r.Method, resp.resp)
+	
+	io.WriteString(w, newResp)
+
+	//TODO: print printinfo.createIngressRequestInfo
+}
+
+func createResponse(api apiCmd) (response) {
+
+	resp := response{}
+	resp.headers = api.headers
+	resp.cookies = api.cookies
+	resp.resp = strings.TrimSpace(api.resp)
 
 	return resp
+}
+
+func createHeaderSlice(headerStr string) ([]header) {
+
+	headers := []header{}
+
+	hs := strings.Split(headerStr, " ")
+
+	if len(hs) == 0 {
+		return headers
+	}
+
+	for _, v := range hs {
+		
+		kvs := strings.Split(v, "=")
+
+		if len(kvs) == 0 {
+			return headers
+		}
+
+		headers = append(headers, header{
+			key: kvs[0],value: kvs[1],
+		})
+	}
+
+	return headers
+}
+
+func createCookieSlice(cookieStr string) ([]cookie) {
+	cookies := []cookie{}
+
+	cs := strings.Split(cookieStr, " ")
+
+	if len(cs) == 0 {
+		return cookies
+	}
+
+	for _, v := range cs {
+		
+		kvs := strings.Split(v, "=")
+
+		if len(kvs) == 0 {
+			return cookies
+		}
+
+
+		cookies = append(cookies, cookie{
+			name: kvs[0],
+			value: kvs[1],
+			expiry: time.Hour * 1,
+		})
+	}
+
+	return cookies
 }
 
 
@@ -252,10 +315,6 @@ func getApiPath(args []string) string {
 	}
 }
 
-func getHeaders(headerStr string) ([]header) {
-	return nil
-}
-
 func getPort(cmd *cobra.Command) (string) {
 	var port string = defaultPort
 	p, _ := cmd.Flags().GetString("port")
@@ -265,42 +324,7 @@ func getPort(cmd *cobra.Command) (string) {
 	return strings.TrimSpace(port)
 }
 
-func getLocalIP() (string, error) {
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		return "", err
-	}
-	for _, iface := range ifaces {
-		if iface.Flags&net.FlagUp == 0 {
-			continue // interface down
-		}
-		if iface.Flags&net.FlagLoopback != 0 {
-			continue // loopback interface
-		}
-		addrs, err := iface.Addrs()
-		if err != nil {
-			return "", err
-		}
-		for _, addr := range addrs {
-			var ip net.IP
-			switch v := addr.(type) {
-			case *net.IPNet:
-				ip = v.IP
-			case *net.IPAddr:
-				ip = v.IP
-			}
-			if ip == nil || ip.IsLoopback() {
-				continue
-			}
-			ip = ip.To4()
-			if ip == nil {
-				continue // not an ipv4 address
-			}
-			return ip.String(), nil
-		}
-	}
-	return "", errors.New("are you connected to the network?")
-}
+
 
 func newAPICmd() (apiCmd) {
 	return apiCmd{
