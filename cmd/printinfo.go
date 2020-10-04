@@ -10,34 +10,34 @@ import (
 )
 
 
-type pInfoApi struct {
-	hostIP string
-	hostName string
-	path string
-	querystring string
-	headers []header
-	resp string //json data or string
-	swaggerPath string
-}
+// type pInfoApi struct {
+// 	hostIP string
+// 	hostName string
+// 	path string
+// 	querystring string
+// 	headers []header
+// 	resp string //json data or string
+// 	swaggerPath string
+// }
 
-type pInfoIngressRequest struct {
-	clientIP string
-}
+// type pInfoIngressRequest struct {
+// 	clientIP string
+// }
 
 func printAPIsInfo(context cmdContext) {
 
 	var info string
 	var newLine string = `
 `
-
+	host, _ := os.Hostname()
 	s, _ := getLocalIP()
-	serverip := color.FgWhite.Sprintf("Server IP: %v", s)
+	serverip := color.FgCyan.Sprintf("APIs running at: %v / %v", s, host)
 	info += newLine
 
 	info += serverip
 	info += newLine
 
-	host, _ := os.Hostname()
+	
 	port := strings.TrimSpace(context.port)
 
 	for _, api := range context.apiCmds {
@@ -48,7 +48,7 @@ func printAPIsInfo(context cmdContext) {
 		}
 
 		fqdn :=
-			color.FgCyan.Sprintf("FQDN: http://%v:%v%v%v", host, port, formatAPIPath(api.path), qs)
+			color.FgLightGreen.Sprintf("FQDN: http://%v:%v%v%v", host, port, formatAPIPath(api.path), qs)
 
 		info += fqdn
 		info += newLine

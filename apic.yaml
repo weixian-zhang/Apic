@@ -1,6 +1,7 @@
   port: "8080"
   rest:
   - path: "/api/store/order/{orderid}"
+    swagdoc-desc:
     querystring: "" #optional
     response: "pickled cucumber" #simple strings or Json data
     headers: #optional
