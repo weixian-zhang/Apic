@@ -1,26 +1,21 @@
 package cmd
 
 import (
-	"os"
-	"bufio"
+	
 	"io"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
-	"io/ioutil"
-	"path/filepath"
-	//"runtime"
+	"bufio"
+	"os"
+	"encoding/json"
 	"github.com/gorilla/mux"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-
-	"github.com/gobuffalo/packr"
-	//"github.com/getlantern/byteexec"
 )
 
-var swaggerPath string
-const apicWinTempPath string = "%APPDATA%/apic"
+
 const apicLinuxTempPath string = "~/apic"
 const defaultPort string = "8080"
 const defaultRestPath string = "/api/new"
@@ -30,6 +25,7 @@ const defaultSwaggerJsonPath string = "/swagger.json"
 
 type cmdContext struct {
 	port string
+	hostName string
 	configPath string
 	swaggerPort string
 	swaggerUIPath string
@@ -38,6 +34,7 @@ type cmdContext struct {
 }
 
 type apiCmd struct {
+	description string
 	path string
 	querystring string
 	headerStr string
@@ -104,70 +101,26 @@ func init() {
 
 func restCmdExecute(cmd *cobra.Command, args []string) {
 
-	box := packr.NewBox("./swag")
-	sbyte, err := box.Find("swagger.exe")
-	fmt.Println(len(sbyte))
-
-	swagYmlByte, err := box.Find("swagger.yml") //create swagger.yml at teml dir
-	fmt.Println(len(swagYmlByte))
-
-	exeDir, err := filepath.Abs(filepath.Dir(os.Args[0]))
-    if err != nil {
-            fmt.Print(err)
-    }
-	
-	ioutil.WriteFile(exeDir + "/swagger.exe", sbyte, 0755)
-	ioutil.WriteFile(exeDir + "/swagger.yml", swagYmlByte, 0755)
-	
-	// if runtime.GOOS == "windows" {
-	// 	swaggerPath = apicWinTempPath
-	// } else {
-	// 	swaggerPath = apicLinuxTempPath
-	// }
-
-	// _, ferr := os.Stat(swaggerPath)
-
-	// if os.IsNotExist(ferr) {
-	// 	os.MkdirAll(swaggerPath, 0755)
-	// }
-
-	// //ioerr := ioutil.WriteFile(swaggerPath + "/swagger.exe", sbyte, 0644)
-	
-	// fmt.Println(err.Error())
-
-	// return
-
-	//ba, err := box.Find("swagger.yml")
-	
-	// swag, err := byteexec.New(sbyte, "swagger")
-	// swagYml, err := byteexec.New(swaggerByte, "swagger")
-	// fmt.Println(swagYml)
-
-	// swagCmd := swag.Command("generate", "spec", "-o ./swagger.yml")
-	// cerr := swagCmd.Wait()
-	//swagCmd := swag.Command("serve", "-p 8090", "-F=swagger", "./swagger.yml")
-
-
-	//swagCmd = swag.Command("serve", "-p 8090", "-F=swagger", "./docs/swagger.yml")
-
-	//rerr := swagCmd.Wait()
-	//fmt.Println(rerr.Error())
-	
 	cmdContext := readCmds(cmd)
 
 	createRest(cmdContext)
 
 	printAPIsInfo(cmdContext)
 
+
+	swagCmd := genSwaggerDocs(cmdContext)
+
 	reader := bufio.NewReader(os.Stdin)
 	r, _, err := reader.ReadRune()
 	fmt.Println(r)
 	fmt.Println(err.Error())
+
+	swagCmd.Process.Kill()
 }
 
 func readCmds(cmd *cobra.Command) (cmdContext) {
 
-	cmdContext := cmdContext{}
+	cmdContext :=newCmdContext()
 	port := getPort(cmd)
 
 	cmdContext.port = port
@@ -359,8 +312,11 @@ func getPort(cmd *cobra.Command) (string) {
 }
 
 func newCmdContext() (cmdContext) {
+	host, _ := os.Hostname()
+
 	return cmdContext {
 		port: defaultPort,
+		hostName: host,
 		swaggerPort: defaultSwaggerPort,
 		swaggerUIPath: defaultSwaggerUIPath,
 		swaggerJsonPath: defaultSwaggerJsonPath,
@@ -368,9 +324,11 @@ func newCmdContext() (cmdContext) {
 }
 
 func newAPICmd() (apiCmd) {
+	j, _ := json.Marshal("success")
 	return apiCmd{
 		path: "/api/new",
-		resp: "mocked resp",
+		resp: string(j),
+		description: "default apic API returning success",
 	}
 }
 
