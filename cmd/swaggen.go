@@ -18,7 +18,7 @@ var swaggerExeTempPath string = filepath.Join(apicWinTempPath, "swagger.exe")
 var swaggerYmlTempPath string = filepath.Join(apicWinTempPath, "gotemplate-swagger.yml")
 var box packr.Box
 
-func genSwaggerDocs(apicon cmdContext) (*exec.Cmd) {
+func genSwaggerDocs(apiContext RestApiContext) (*exec.Cmd) {
 	box = packr.NewBox("./swag")
 	sbyte, _ := box.Find("swagger.exe")
 	
@@ -30,18 +30,17 @@ func genSwaggerDocs(apicon cmdContext) (*exec.Cmd) {
 
 	if !fileDirExists(swaggerPath) {
 		os.Mkdir(swaggerPath, 0755)
+		//TODO: log, fail to create apic temp folder
 	}
 
 	if !fileDirExists(swaggerExeTempPath) {
 		ioutil.WriteFile(swaggerExeTempPath, sbyte,0755)
-		//fmt.Println(ioerr)
+		//TODO: log, log fail to create swagger yml at temp folder
 	}
 
-	genSwaggerYml(apicon)
+	genSwaggerYml(apiContext) //gens swagger yaml in apic temp folder
 
-	// swagArgs := fmt.Sprintf("serve -p %v -F=swagger %v", defaultSwaggerPort, swaggerYmlTempPath)
-	// fmt.Println(swagArgs)
-	swagexecCmd := exec.Command("swagger", "serve", "-p", "8090", "-F=swagger", "./gotemplate-swagger.yml") //exec.Command(swaggerExeTempPath, "serve", "-p 8090", "-F=swagger", swaggerYmlTempPath)
+	swagexecCmd := exec.Command("swagger", "serve", "-p", apiContext.swaggerPort, "-F=swagger", "./gotemplate-swagger.yml")
 	swagexecCmd.Dir = swaggerPath
 	
 	var out bytes.Buffer
@@ -57,20 +56,25 @@ func genSwaggerDocs(apicon cmdContext) (*exec.Cmd) {
 	// }
 	// fmt.Println("Result: " + out.String())
 
+	//TODO: log, swagger 
 	return swagexecCmd
 }
 
-func genSwaggerYml(cmdCon cmdContext) (error) {
+//swagger editor
+//https://editor.swagger.io/
+func genSwaggerYml(cmdCon RestApiContext) (error) {
 	swagYmlStr, _ := box.FindString("gotemplate-swagger.tpl")
 
 	t, err := template.New("swagger").Parse(swagYmlStr)
 	if err != nil {
 		fmt.Println(err)
+		//TODO: log
 		return err
 	}
 	fmt.Println(swagYmlStr)
 
 	 eerr := t.Execute(os.Stdout, cmdCon)
+	 //TODO: log
 	 fmt.Println(eerr)
 
 	return nil

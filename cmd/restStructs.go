@@ -7,18 +7,19 @@ import(
 	"os"
 )
 
-type cmdContext struct {
+type RestApiContext struct {
 	Port string
 	HostName string
+	SwaggerTagName string
+	SwaggerTagDesc string
 	configPath string
 	swaggerPort string
-	swaggerUIPath string
-	swaggerJsonPath string
-	ApiCmds []apiCmd
+	RestApis []RestApi
 }
 
-type apiCmd struct {
-	Description string
+type RestApi struct {
+	SwagDesc string
+	OperationId string
 	Path string
 	Querystring string
 	headerStr string
@@ -56,7 +57,7 @@ type response struct {
 	cookies []cookie
 }
 
-func newResponse(api apiCmd) (response) {
+func newResponse(api RestApi) (response) {
 
 	resp := response{}
 	resp.headers = api.headers
@@ -120,23 +121,24 @@ func newCookieSlice(cookieStr string) ([]cookie) {
 	return cookies
 }
 
-func newCmdContext() (cmdContext) {
+func newRestApiContext() (RestApiContext) {
 	host, _ := os.Hostname()
 
-	return cmdContext {
+	return RestApiContext {
 		Port: defaultPort,
 		HostName: host,
+		SwaggerTagName: "Order",
+		SwaggerTagDesc: "Order",
 		swaggerPort: defaultSwaggerPort,
-		swaggerUIPath: defaultSwaggerUIPath,
-		swaggerJsonPath: defaultSwaggerJsonPath,
 	}
 }
 
-func newAPICmd() (apiCmd) {
+func newRestApi() (RestApi) {
 	j, _ := json.Marshal("success")
-	return apiCmd{
-		Path: "/api/new",
+	return RestApi{
+		Path: "/api/order/new",
 		Resp: string(j),
-		Description: "default apic API returning success",
+		SwagDesc: "Creates new order",
+		OperationId: "newOrder",
 	}
 }

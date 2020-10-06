@@ -24,7 +24,7 @@ import (
 // 	clientIP string
 // }
 
-func printAPIsInfo(context cmdContext) {
+func printAPIsInfo(context RestApiContext) {
 
 	var info string
 	var newLine string = `
@@ -40,7 +40,7 @@ func printAPIsInfo(context cmdContext) {
 	
 	port := strings.TrimSpace(context.Port)
 
-	for _, api := range context.ApiCmds {
+	for _, api := range context.RestApis {
 
 		qs := api.Querystring
 		if api.Querystring != "" {

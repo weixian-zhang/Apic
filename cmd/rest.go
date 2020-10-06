@@ -52,14 +52,14 @@ func init() {
 
 func restCmdExecute(cmd *cobra.Command, args []string) {
 
-	cmdContext := readCmds(cmd)
+	restApiContext := readCmds(cmd)
 
-	createRest(cmdContext)
+	createRest(restApiContext)
 
-	printAPIsInfo(cmdContext)
+	printAPIsInfo(restApiContext)
 
 
-	swagCmd := genSwaggerDocs(cmdContext)
+	swagCmd := genSwaggerDocs(restApiContext)
 
 	reader := bufio.NewReader(os.Stdin)
 	r, _, err := reader.ReadRune()
@@ -69,58 +69,58 @@ func restCmdExecute(cmd *cobra.Command, args []string) {
 	swagCmd.Process.Kill()
 }
 
-func readCmds(cmd *cobra.Command) (cmdContext) {
+func readCmds(cmd *cobra.Command) (RestApiContext) {
 
-	cmdContext :=newCmdContext()
+	restApiContext :=newRestApiContext()
 	port := getPort(cmd)
 
-	cmdContext.Port = port
+	restApiContext.Port = port
 	configPath, _ := cmd.Flags().GetString("config")
-	cmdContext.configPath = configPath
+	restApiContext.configPath = configPath
 
 	if configPath != "" {
-		cmdContext.ApiCmds = readConfigFileCmds(configPath)
+		restApiContext.RestApis = readConfigFileCmds(configPath)
 	} else {
-		cmdContext.ApiCmds = readCliCmd(cmd)
+		restApiContext.RestApis = readCliCmd(cmd)
 	}
 
-	return cmdContext
+	return restApiContext
 }
 
-func readCliCmd(cmd *cobra.Command) ([]apiCmd) {
+func readCliCmd(cmd *cobra.Command) ([]RestApi) {
 
-	apis := []apiCmd{}
+	apis := []RestApi{}
 
-	apicmd := newAPICmd()
-	apicmd.Path = cmd.Flags().Arg(0)
-	if apicmd.Path == "" {
-		apicmd.Path = defaultRestPath
+	api := newRestApi()
+	api.Path = cmd.Flags().Arg(0)
+	if api.Path == "" {
+		api.Path = defaultRestPath
 	} else {
-		apicmd.Path =  formatAPIPath(strings.TrimSpace(apicmd.Path))
+		api.Path =  formatAPIPath(strings.TrimSpace(api.Path))
 	}
 
 	cmd.Flags().Visit(func(f *pflag.Flag) {
 
 		switch f.Name {
 			case "querystr":
-				apicmd.Querystring = strings.TrimSpace(f.Value.String())
+				api.Querystring = strings.TrimSpace(f.Value.String())
 			case "resp":
-				apicmd.Resp = f.Value.String()
+				api.Resp = f.Value.String()
 			case "header":
-				apicmd.headerStr = strings.TrimSpace(f.Value.String())
-				apicmd.headers = newHeaderSlice(apicmd.headerStr)
+				api.headerStr = strings.TrimSpace(f.Value.String())
+				api.headers = newHeaderSlice(api.headerStr)
 			case "cookie":
-				apicmd.cookieStr = strings.TrimSpace(f.Value.String())
-				apicmd.cookies = newCookieSlice(apicmd.cookieStr)
+				api.cookieStr = strings.TrimSpace(f.Value.String())
+				api.cookies = newCookieSlice(api.cookieStr)
 		}
 	})
 
-	apis = append(apis, apicmd)
+	apis = append(apis, api)
 
 	return apis
 }
 
-func readConfigFileCmds(configPath string) ([]apiCmd) {
+func readConfigFileCmds(configPath string) ([]RestApi) {
 
 	//TODO: log err
 	fmt.Println(configPath)
@@ -132,21 +132,21 @@ func readConfigFileCmds(configPath string) ([]apiCmd) {
 	return nil
 }
 
-func createRest(cmdCon cmdContext) {
+func createRest(apiContext RestApiContext) {
 
 	r := mux.NewRouter()
 
-	for _, v := range cmdCon.ApiCmds {
+	for _, v := range apiContext.RestApis {
 
 		resp := newResponse(v)
 
 		createRestHandlers(r, v, resp)
 	}
 
-	go http.ListenAndServe(fmt.Sprintf(":%s", cmdCon.Port), r)
+	go http.ListenAndServe(fmt.Sprintf(":%s", apiContext.Port), r)
 }
 
-func createRestHandlers(r *mux.Router, api apiCmd, resp response ) { //cmd apiCmd, cmdCon cmdContext) {
+func createRestHandlers(r *mux.Router, api RestApi, resp response ) { //cmd RestApi, cmdCon RestApiContext) {
 	
 	r.HandleFunc(api.Path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, resp) }).Methods("GET")
 	
@@ -157,7 +157,7 @@ func createRestHandlers(r *mux.Router, api apiCmd, resp response ) { //cmd apiCm
 	r.HandleFunc(api.Path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, resp) }).Methods("DELETE")
 }
 
-func handleResponse(w http.ResponseWriter, r *http.Request, resp response) { //} api apiCmd, cmdCon cmdContext) {
+func handleResponse(w http.ResponseWriter, r *http.Request, resp response) { //} api RestApi, cmdCon RestApiContext) {
 
 	for _, h := range resp.headers {
 		w.Header().Add(h.key, h.value)
