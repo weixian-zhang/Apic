@@ -38,17 +38,17 @@ func printAPIsInfo(context cmdContext) {
 	info += newLine
 
 	
-	port := strings.TrimSpace(context.port)
+	port := strings.TrimSpace(context.Port)
 
-	for _, api := range context.apiCmds {
+	for _, api := range context.ApiCmds {
 
-		qs := api.querystring
-		if api.querystring != "" {
+		qs := api.Querystring
+		if api.Querystring != "" {
 			qs = "?" + qs
 		}
 
 		fqdn :=
-			color.FgLightGreen.Sprintf("FQDN: http://%v:%v%v%v", host, port, formatAPIPath(api.path), qs)
+			color.FgLightGreen.Sprintf("FQDN: http://%v:%v%v%v", host, port, formatAPIPath(api.Path), qs)
 
 		info += fqdn
 		info += newLine

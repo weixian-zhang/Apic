@@ -5,11 +5,9 @@ import (
 	"io"
 	"fmt"
 	"net/http"
-	"strings"
-	"time"
 	"bufio"
 	"os"
-	"encoding/json"
+	"strings"
 	"github.com/gorilla/mux"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -23,54 +21,7 @@ const defaultSwaggerPort string = "8090"
 const defaultSwaggerUIPath string = "/docs"
 const defaultSwaggerJsonPath string = "/swagger.json"
 
-type cmdContext struct {
-	port string
-	hostName string
-	configPath string
-	swaggerPort string
-	swaggerUIPath string
-	swaggerJsonPath string
-	apiCmds []apiCmd
-}
 
-type apiCmd struct {
-	description string
-	path string
-	querystring string
-	headerStr string
-	headers []header
-	cookieStr string
-	cookies []cookie
-	resp string
-	data string
-	auth apiAuth
-}
-
-type apiAuth struct {
-	enableAuth bool
-	mode string
-	userName string
-	password string
-	jwtToken string
-	publiCert string
-}
-
-type header struct {
-	key string
-	value string
-}
-
-type cookie struct {
-	name string
-	value string
-	expiry time.Duration
-}
-
-type response struct {
-	resp string
-	headers []header
-	cookies []cookie
-}
 
 // restCmd represents the rest command
 var restCmd = &cobra.Command{
@@ -123,14 +74,14 @@ func readCmds(cmd *cobra.Command) (cmdContext) {
 	cmdContext :=newCmdContext()
 	port := getPort(cmd)
 
-	cmdContext.port = port
+	cmdContext.Port = port
 	configPath, _ := cmd.Flags().GetString("config")
 	cmdContext.configPath = configPath
 
 	if configPath != "" {
-		cmdContext.apiCmds = readConfigFileCmds(configPath)
+		cmdContext.ApiCmds = readConfigFileCmds(configPath)
 	} else {
-		cmdContext.apiCmds = readCliCmd(cmd)
+		cmdContext.ApiCmds = readCliCmd(cmd)
 	}
 
 	return cmdContext
@@ -141,26 +92,26 @@ func readCliCmd(cmd *cobra.Command) ([]apiCmd) {
 	apis := []apiCmd{}
 
 	apicmd := newAPICmd()
-	apicmd.path = cmd.Flags().Arg(0)
-	if apicmd.path == "" {
-		apicmd.path = defaultRestPath
+	apicmd.Path = cmd.Flags().Arg(0)
+	if apicmd.Path == "" {
+		apicmd.Path = defaultRestPath
 	} else {
-		apicmd.path =  formatAPIPath(strings.TrimSpace(apicmd.path))
+		apicmd.Path =  formatAPIPath(strings.TrimSpace(apicmd.Path))
 	}
 
 	cmd.Flags().Visit(func(f *pflag.Flag) {
 
 		switch f.Name {
 			case "querystr":
-				apicmd.querystring = strings.TrimSpace(f.Value.String())
+				apicmd.Querystring = strings.TrimSpace(f.Value.String())
 			case "resp":
-				apicmd.resp = f.Value.String()
+				apicmd.Resp = f.Value.String()
 			case "header":
 				apicmd.headerStr = strings.TrimSpace(f.Value.String())
-				apicmd.headers = createHeaderSlice(apicmd.headerStr)
+				apicmd.headers = newHeaderSlice(apicmd.headerStr)
 			case "cookie":
 				apicmd.cookieStr = strings.TrimSpace(f.Value.String())
-				apicmd.cookies = createCookieSlice(apicmd.cookieStr)
+				apicmd.cookies = newCookieSlice(apicmd.cookieStr)
 		}
 	})
 
@@ -185,25 +136,25 @@ func createRest(cmdCon cmdContext) {
 
 	r := mux.NewRouter()
 
-	for _, v := range cmdCon.apiCmds {
+	for _, v := range cmdCon.ApiCmds {
 
-		resp := createResponse(v)
+		resp := newResponse(v)
 
 		createRestHandlers(r, v, resp)
 	}
 
-	go http.ListenAndServe(fmt.Sprintf(":%s", cmdCon.port), r)
+	go http.ListenAndServe(fmt.Sprintf(":%s", cmdCon.Port), r)
 }
 
 func createRestHandlers(r *mux.Router, api apiCmd, resp response ) { //cmd apiCmd, cmdCon cmdContext) {
 	
-	r.HandleFunc(api.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, resp) }).Methods("GET")
+	r.HandleFunc(api.Path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, resp) }).Methods("GET")
 	
-	r.HandleFunc(api.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, resp) }).Methods("POST")
+	r.HandleFunc(api.Path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, resp) }).Methods("POST")
 
-	r.HandleFunc(api.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, resp) }).Methods("PUT")
+	r.HandleFunc(api.Path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, resp) }).Methods("PUT")
 
-	r.HandleFunc(api.path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, resp) }).Methods("DELETE")
+	r.HandleFunc(api.Path, func(w http.ResponseWriter, r *http.Request){ handleResponse(w, r, resp) }).Methods("DELETE")
 }
 
 func handleResponse(w http.ResponseWriter, r *http.Request, resp response) { //} api apiCmd, cmdCon cmdContext) {
@@ -229,71 +180,6 @@ func handleResponse(w http.ResponseWriter, r *http.Request, resp response) { //}
 	//TODO: print printinfo.createIngressRequestInfo
 }
 
-func createResponse(api apiCmd) (response) {
-
-	resp := response{}
-	resp.headers = api.headers
-	resp.cookies = api.cookies
-	resp.resp = strings.TrimSpace(api.resp)
-
-	return resp
-}
-
-func createHeaderSlice(headerStr string) ([]header) {
-
-	headers := []header{}
-
-	hs := strings.Split(headerStr, " ")
-
-	if len(hs) == 0 {
-		return headers
-	}
-
-	for _, v := range hs {
-		
-		kvs := strings.Split(v, "=")
-
-		if len(kvs) == 0 {
-			return headers
-		}
-
-		headers = append(headers, header{
-			key: kvs[0],value: kvs[1],
-		})
-	}
-
-	return headers
-}
-
-func createCookieSlice(cookieStr string) ([]cookie) {
-	cookies := []cookie{}
-
-	cs := strings.Split(cookieStr, " ")
-
-	if len(cs) == 0 {
-		return cookies
-	}
-
-	for _, v := range cs {
-		
-		kvs := strings.Split(v, "=")
-
-		if len(kvs) == 0 {
-			return cookies
-		}
-
-
-		cookies = append(cookies, cookie{
-			name: kvs[0],
-			value: kvs[1],
-			expiry: time.Hour * 1,
-		})
-	}
-
-	return cookies
-}
-
-
 func getApiPath(args []string) string {
 	if len(args) > 0 {
 		return args[0]
@@ -309,27 +195,6 @@ func getPort(cmd *cobra.Command) (string) {
 		port = p
 	}
 	return strings.TrimSpace(port)
-}
-
-func newCmdContext() (cmdContext) {
-	host, _ := os.Hostname()
-
-	return cmdContext {
-		port: defaultPort,
-		hostName: host,
-		swaggerPort: defaultSwaggerPort,
-		swaggerUIPath: defaultSwaggerUIPath,
-		swaggerJsonPath: defaultSwaggerJsonPath,
-	}
-}
-
-func newAPICmd() (apiCmd) {
-	j, _ := json.Marshal("success")
-	return apiCmd{
-		path: "/api/new",
-		resp: string(j),
-		description: "default apic API returning success",
-	}
 }
 
 

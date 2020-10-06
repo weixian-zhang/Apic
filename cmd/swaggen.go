@@ -61,7 +61,7 @@ func genSwaggerDocs(apicon cmdContext) (*exec.Cmd) {
 }
 
 func genSwaggerYml(cmdCon cmdContext) (error) {
-	swagYmlStr, _ := box.FindString("gotemplate-swagger.yml")
+	swagYmlStr, _ := box.FindString("gotemplate-swagger.tpl")
 
 	t, err := template.New("swagger").Parse(swagYmlStr)
 	if err != nil {
@@ -70,7 +70,8 @@ func genSwaggerYml(cmdCon cmdContext) (error) {
 	}
 	fmt.Println(swagYmlStr)
 
-	t.Execute(os.Stdout, cmdCon)
+	 eerr := t.Execute(os.Stdout, cmdCon)
+	 fmt.Println(eerr)
 
 	return nil
 }
