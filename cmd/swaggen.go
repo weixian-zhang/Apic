@@ -1,14 +1,16 @@
 package cmd
 
 import (
-	"io/ioutil"
-	"fmt"
 	"bytes"
+	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
-	"text/template"
 	"path/filepath"
 	"runtime"
+	"text/template"
+	//"time"
+
 	"github.com/gobuffalo/packr"
 )
 
@@ -18,9 +20,10 @@ var swaggerExeTempPath string = filepath.Join(apicWinTempPath, "swagger.exe")
 var swaggerYmlTempPath string = filepath.Join(apicWinTempPath, "gotemplate-swagger.yml")
 var box packr.Box
 
-func genSwaggerDocs(apiContext RestApiContext) (*exec.Cmd) {
+func serveSwaggerDocs(pexit <-chan bool, apiContext RestApiContext) (error) {
+
+
 	box = packr.NewBox("./swag")
-	sbyte, _ := box.Find("swagger.exe")
 	
 	if runtime.GOOS == "windows" {
 		swaggerPath = apicWinTempPath
@@ -33,36 +36,33 @@ func genSwaggerDocs(apiContext RestApiContext) (*exec.Cmd) {
 		//TODO: log, fail to create apic temp folder
 	}
 
-	if !fileDirExists(swaggerExeTempPath) {
-		ioutil.WriteFile(swaggerExeTempPath, sbyte,0755)
-		//TODO: log, log fail to create swagger yml at temp folder
+	err := genSwaggerYml(apiContext) //gens swagger yaml in apic temp folder
+	if err != nil {
+		return err
 	}
 
-	genSwaggerYml(apiContext) //gens swagger yaml in apic temp folder
+	serr := execSwagger(pexit, apiContext)
+	if serr != nil {
+		return serr
+	}
 
-	swagexecCmd := exec.Command("swagger", "serve", "-p", apiContext.swaggerPort, "-F=swagger", "./gotemplate-swagger.yml")
-	swagexecCmd.Dir = swaggerPath
-	
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	swagexecCmd.Stdout = &out
-	swagexecCmd.Stderr = &stderr
-
-	// serr := swagexecCmd.Start()
-
-	// if serr != nil {
-	// 	fmt.Println(fmt.Sprint(serr) + ": " + stderr.String())
-	// 	return nil
-	// }
-	// fmt.Println("Result: " + out.String())
-
-	//TODO: log, swagger 
-	return swagexecCmd
+	return nil
 }
 
 //swagger editor
 //https://editor.swagger.io/
 func genSwaggerYml(cmdCon RestApiContext) (error) {
+	
+	if fileDirExists(swaggerYmlTempPath) {
+		err := os.Remove(swaggerYmlTempPath)
+		if err != nil {
+			//TODO: log
+			fmt.Println(err)
+			return err
+		}
+	}
+
+	//get template from packr packed file
 	swagYmlStr, _ := box.FindString("gotemplate-swagger.tpl")
 
 	t, err := template.New("swagger").Parse(swagYmlStr)
@@ -73,10 +73,58 @@ func genSwaggerYml(cmdCon RestApiContext) (error) {
 	}
 	fmt.Println(swagYmlStr)
 
-	 eerr := t.Execute(os.Stdout, cmdCon)
+	file, err := os.Create(swaggerYmlTempPath)
+	if err != nil {
+		//TODO: log
+		fmt.Println(err)
+		return err
+	}
+
+	 eerr := t.Execute(file, cmdCon)
 	 //TODO: log
 	 fmt.Println(eerr)
 
+	return nil
+}
+
+func execSwagger(pexit <-chan bool, apiContext RestApiContext) (error) {
+	sbyte, _ := box.Find("swagger.exe")
+
+	if !fileDirExists(swaggerExeTempPath) {
+		ioutil.WriteFile(swaggerExeTempPath, sbyte, 0755)
+	}
+
+	swagexecCmd := exec.Command("swagger", "serve", "-p", apiContext.swaggerPort, "-F=swagger", "./gotemplate-swagger.yml")
+	swagexecCmd.Dir = swaggerPath
+	
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	swagexecCmd.Stdout = &out
+	swagexecCmd.Stderr = &stderr
+
+	serr := swagexecCmd.Start()
+
+	if serr != nil {
+		fmt.Println(fmt.Sprint(serr) + ": " + stderr.String())
+		return serr
+	}
+	var val bool = <-pexit
+	fmt.Println(val)
+
+	go func() {
+		//for {
+		select {
+			case <- pexit: //on cli exits kill swagger.exe
+				swagexecCmd.Process.Kill()
+				os.Exit(1)
+
+			//time.Sleep(2 * time.Second)
+		}
+		//}
+	}()
+
+	
+	
 	return nil
 }
 

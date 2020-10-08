@@ -52,26 +52,27 @@ func init() {
 
 func restCmdExecute(cmd *cobra.Command, args []string) {
 
-	restApiContext := readCmds(cmd)
+	restApiContext := createApis(cmd)
 
 	createRest(restApiContext)
 
 	printAPIsInfo(restApiContext)
 
+	pexit := make(chan bool, 1) //receive only
+	pexit <- false
 
-	swagCmd := genSwaggerDocs(restApiContext)
+	go serveSwaggerDocs(pexit, restApiContext)
 
 	reader := bufio.NewReader(os.Stdin)
-	r, _, err := reader.ReadRune()
-	fmt.Println(r)
-	fmt.Println(err.Error())
+	r, _, _ := reader.ReadRune()
+	fmt.Print(r)
 
-	swagCmd.Process.Kill()
+	pexit <- true //kills swagger.exe process
 }
 
-func readCmds(cmd *cobra.Command) (RestApiContext) {
+func createApis(cmd *cobra.Command) (RestApiContext) {
 
-	restApiContext :=newRestApiContext()
+	restApiContext := newRestApiContext()
 	port := getPort(cmd)
 
 	restApiContext.Port = port
@@ -172,12 +173,9 @@ func handleResponse(w http.ResponseWriter, r *http.Request, resp response) { //}
 		http.SetCookie(w,&cookie)
 	}
 
-	newResp := fmt.Sprintf(`%v:
-%v`,  r.Method, resp.resp)
-	
-	io.WriteString(w, newResp)
+	io.WriteString(w, resp.resp)
 
-	//TODO: print printinfo.createIngressRequestInfo
+	printIngreReqInfo(r)
 }
 
 func getApiPath(args []string) string {

@@ -2,13 +2,15 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"strings"
-	"fmt"
+	"time"
+
 	"github.com/gookit/color"
 )
-
 
 // type pInfoApi struct {
 // 	hostIP string
@@ -79,8 +81,8 @@ func printAPIsInfo(context RestApiContext) {
 	fmt.Println(info)
 }
 
-func printIngressRequestInfo() {
-
+func printIngreReqInfo(r *http.Request) {
+	fmt.Println(color.LightWhite.Sprintf("received at=%v, from client=%v", time.Now().Format("15:04"), r.RemoteAddr))
 }
 
 func getLocalIP() (string, error) {
