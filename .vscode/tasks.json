@@ -28,6 +28,19 @@
                 }
             },
             "problemMatcher": []
+        },
+        {
+            "label": "packr build apic",
+            "command": "packr build",
+            "type": "shell",
+            "args": [],
+            "options": {
+                "cwd": "${workspaceFolder}/",
+                "env": {
+                    "env": "dev"
+                }
+            },
+            "problemMatcher": []
         }
     ]
 }

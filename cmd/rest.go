@@ -14,40 +14,42 @@ import (
 )
 
 
-const apicLinuxTempPath string = "~/apic"
 const defaultPort string = "8080"
-const defaultRestPath string = "/api/new"
 const defaultSwaggerPort string = "8090"
-const defaultSwaggerUIPath string = "/docs"
-const defaultSwaggerJsonPath string = "/swagger.json"
-
-
+const defaultRestPath string = "/api/new"
+// const defaultSwaggerUIPath string = "/docs"
+// const defaultSwaggerJsonPath string = "/swagger.json"
 
 // restCmd represents the rest command
 var restCmd = &cobra.Command{
 	Use:   "rest",
 	Short: "Creates REST API",
 	Long: 
-	``, //TODO desc flags
+`
+-apic host rest creates a Rest Api with a single path
+-use with config file to create a Rest Api with many paths
+-open multiple cmdlines to run multiple apic sessions to achieve multi-Apis and paths`, //TODO desc flags
 	Run: restCmdExecute,
 }
 
 
 func init() {
 
-	hostCmd.AddCommand(restCmd)
+	rootCmd.AddCommand(restCmd)
 
 	restCmd.PersistentFlags().StringP("config", "", "", "config file to host series of APIs")
 
+	restCmd.PersistentFlags().StringP("swagggerport", "", "", "define Swagger docs serving port, default 8090")
+
 	restCmd.PersistentFlags().StringP("querystr", "q", "", "query string")
 	
-	restCmd.PersistentFlags().StringP("port", "p", "", "specify listening port, default:8080")
+	restCmd.PersistentFlags().StringP("port", "p", "", "define listening port, default:8080")
 
 	restCmd.PersistentFlags().StringP("header", "d", "", "i.e: content-type=application/json custom-key=customvalue")
 
 	restCmd.PersistentFlags().StringP("cookie", "k", "", "i.e: cookie1=value1 cookie2=value2")
 	
-	restCmd.PersistentFlags().StringP("resp", "r", "", "mock response (always json)")
+	restCmd.PersistentFlags().StringP("resp", "r", "", "define response (always json)")
 }
 
 func restCmdExecute(cmd *cobra.Command, args []string) {
@@ -73,9 +75,15 @@ func restCmdExecute(cmd *cobra.Command, args []string) {
 func createApis(cmd *cobra.Command) (RestApiContext) {
 
 	restApiContext := newRestApiContext()
-	port := getPort(cmd)
 
+	port := getPort(cmd)
 	restApiContext.Port = port
+	
+	sp,_ := cmd.Flags().GetString("swaggerport")
+	if sp != "" {
+		restApiContext.swaggerPort = sp
+	}
+
 	configPath, _ := cmd.Flags().GetString("config")
 	restApiContext.configPath = configPath
 
@@ -173,7 +181,10 @@ func handleResponse(w http.ResponseWriter, r *http.Request, resp response) { //}
 		http.SetCookie(w,&cookie)
 	}
 
-	io.WriteString(w, resp.resp)
+	newResp := fmt.Sprintf(`%v
+%v`, r.Method, resp.resp)
+
+	io.WriteString(w, newResp)
 
 	printIngreReqInfo(r)
 }

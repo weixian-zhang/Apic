@@ -33,7 +33,7 @@ func printAPIsInfo(context RestApiContext) {
 `
 	host, _ := os.Hostname()
 	s, _ := getLocalIP()
-	serverip := color.FgCyan.Sprintf("APIs running at: %v / %v", s, host)
+	serverip := color.FgCyan.Sprintf("APIs running on: %v/%v", s, host)
 	info += newLine
 
 	info += serverip
@@ -41,6 +41,7 @@ func printAPIsInfo(context RestApiContext) {
 
 	
 	port := strings.TrimSpace(context.Port)
+	swagPort := strings.TrimSpace(context.swaggerPort)
 
 	for _, api := range context.RestApis {
 
@@ -49,10 +50,21 @@ func printAPIsInfo(context RestApiContext) {
 			qs = "?" + qs
 		}
 
-		fqdn :=
-			color.FgLightGreen.Sprintf("FQDN: http://%v:%v%v%v", host, port, formatAPIPath(api.Path), qs)
+		apiAddr :=
+			color.FgLightGreen.Sprintf("Api: http://%v:%v%v%v", host, port, formatAPIPath(api.Path), qs)
+		swagUIAddr :=
+			color.FgLightGreen.Sprintf("Swagger UI: http://%v:%v%v", host, swagPort, "/docs")
 
-		info += fqdn
+		swagJsonAddr :=
+			color.FgLightGreen.Sprintf("Swagger Json: http://%v:%v%v", host, swagPort, "/swagger.json")
+
+		info += apiAddr
+		info += newLine
+
+		info += swagUIAddr
+		info += newLine
+
+		info += swagJsonAddr
 		info += newLine
 
 		headerStr := "not specified"
@@ -82,7 +94,28 @@ func printAPIsInfo(context RestApiContext) {
 }
 
 func printIngreReqInfo(r *http.Request) {
-	fmt.Println(color.LightWhite.Sprintf("received at=%v, from client=%v", time.Now().Format("15:04"), r.RemoteAddr))
+	clientIP := readSourceIP(r)
+	fmt.Println(color.LightWhite.Sprintf("received at: %v, from client: %v", time.Now().Format("15:04"), clientIP))
+}
+
+func printErr(err error) {
+	if err != nil {
+		color.FgRed.Println(err.Error())
+	}
+}
+func printInfo(msg string) {
+	color.FgLightGreen.Println(msg)
+}
+
+func readSourceIP(r *http.Request) string {
+    IPAddress := r.Header.Get("X-Real-Ip")
+    if IPAddress == "" {
+        IPAddress = r.Header.Get("X-Forwarded-For")
+    }
+    if IPAddress == "" {
+        IPAddress = r.RemoteAddr
+    }
+    return IPAddress
 }
 
 func getLocalIP() (string, error) {
