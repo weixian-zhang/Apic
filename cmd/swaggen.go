@@ -15,7 +15,7 @@ import (
 )
 
 var swaggerPath string
-const apicLinuxTempPath string = "~/apic"
+const apicLinuxTempPath string = "/tmp/apic"
 var apicWinTempPath string = filepath.Join(os.Getenv("APPDATA"), "apic")
 var swaggerTempPath string
 var swaggerExeTempPath string = filepath.Join(apicWinTempPath, "swagger.exe")
@@ -29,9 +29,6 @@ var box *packr.Box
 func initExeYmlSwagPath() {
 	if runtime.GOOS == "windows" {
 		swaggerPath = apicWinTempPath
-
-		//err := exec.Command("setx", "path", swaggerPath).Run() //set swagger path to %PATH%
-		//printErr(err)
 	} else {
 		swaggerPath = apicLinuxTempPath
 	}
@@ -39,6 +36,8 @@ func initExeYmlSwagPath() {
 	swaggerTempPath = swaggerPath
 	swaggerExeTempPath = filepath.Join(swaggerTempPath, "swagger.exe")
 	swaggerYmlTempPath = filepath.Join(swaggerTempPath, "gotemplate-swagger.yml")
+
+
 }
 
 func serveSwaggerDocs(pexit chan bool, apiContext RestApiContext) (error) {
@@ -119,21 +118,23 @@ func execSwagger(pexit chan bool, apiContext RestApiContext) (error) {
 	swagexecCmd.Stdout = &out
 	swagexecCmd.Stderr = &stderr
 
-	serr := swagexecCmd.Start()
+	serr := swagexecCmd.Run()
 
 	if serr != nil {
 		fmt.Println("swagstart: " + fmt.Sprint(serr.Error()) + ": " + stderr.String())
 		return serr
 	}
 
-	printInfo(os.Getenv("PATH"))
-	printInfo(swagexecCmd.String())
+	// printInfo(os.Getenv("PATH"))
+	// printInfo(swagexecCmd.String())
 
 	go func() {
 		//for {
 		select {
 			case <- pexit: //on cli exits kill swagger.exe
-			swagexecCmd.Process.Kill()
+				printInfo("swagger terminated...")
+				return
+			//swagexecCmd.Process.Kill()
 		}
 		//}
 	}()

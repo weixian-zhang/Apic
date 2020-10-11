@@ -45,13 +45,8 @@ func printAPIsInfo(context RestApiContext) {
 
 	for _, api := range context.RestApis {
 
-		qs := api.Querystring
-		if api.Querystring != "" {
-			qs = "?" + qs
-		}
-
 		apiAddr :=
-			color.FgLightGreen.Sprintf("Api: http://%v:%v%v%v", host, port, formatAPIPath(api.Path), qs)
+			color.FgLightGreen.Sprintf("Api: http://%v:%v%v%v", host, port, api.Path, api.Querystring)
 		swagUIAddr :=
 			color.FgLightGreen.Sprintf("Swagger UI: http://%v:%v%v", host, swagPort, "/docs")
 
@@ -155,13 +150,3 @@ func getLocalIP() (string, error) {
 	return "", errors.New("are you connected to the network?")
 }
 
-func formatAPIPath(path string) (string) {
-	var newPath string
-	newPath = strings.TrimSpace(path)
-
-	if fc := newPath[0:1]; fc != "/" {
-		newPath = "/" + newPath
-	}
-
-	return newPath
-}

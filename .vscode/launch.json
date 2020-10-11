@@ -14,7 +14,8 @@
             "env": {
                 "env": "dev"
             },
-            "args": ["rest"]
+            "args": ["rest", "-p 8071", "--swaggerport", "8072", "-r {\"userName\":\"weixian\"}", "-q id=110&username='john dane'"]
+              
             //"args": ["host", "rest", "/api/order/new", "-r new order received", "-q id=2&order=new", "-p 8090"]
         },
     ]

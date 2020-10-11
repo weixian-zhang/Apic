@@ -5,6 +5,7 @@ import (
 	"io"
 	"fmt"
 	"net/http"
+	"net/url"
 	"bufio"
 	"os"
 	"strings"
@@ -17,8 +18,6 @@ import (
 const defaultPort string = "8080"
 const defaultSwaggerPort string = "8090"
 const defaultRestPath string = "/api/new"
-// const defaultSwaggerUIPath string = "/docs"
-// const defaultSwaggerJsonPath string = "/swagger.json"
 
 // restCmd represents the rest command
 var restCmd = &cobra.Command{
@@ -28,7 +27,9 @@ var restCmd = &cobra.Command{
 `
 -apic host rest creates a Rest Api with a single path
 -use with config file to create a Rest Api with many paths
--open multiple cmdlines to run multiple apic sessions to achieve multi-Apis and paths`, //TODO desc flags
+-open multiple cmdlines to run multiple apic sessions to achieve multi-Apis and paths
+Example default args: apic rest
+Example 2 custom args: apic rest /user/new -p 8071 --swaggerport 8072 -q userid=110&tag=name -r {"userName":"John Nash"}`, //TODO desc flags
 	Run: restCmdExecute,
 }
 
@@ -39,9 +40,9 @@ func init() {
 
 	restCmd.PersistentFlags().StringP("config", "", "", "config file to host series of APIs")
 
-	restCmd.PersistentFlags().StringP("swagggerport", "", "", "define Swagger docs serving port, default 8090")
+	restCmd.PersistentFlags().StringP("swaggerport", "", "", "define Swagger docs serving port, default 8090")
 
-	restCmd.PersistentFlags().StringP("querystr", "q", "", "query string")
+	restCmd.PersistentFlags().StringP("querystr", "q", "", "query string: id=110&name='john dane'")
 	
 	restCmd.PersistentFlags().StringP("port", "p", "", "define listening port, default:8080")
 
@@ -56,7 +57,7 @@ func restCmdExecute(cmd *cobra.Command, args []string) {
 
 	restApiContext := createApis(cmd)
 
-	createRest(restApiContext)
+	initApiListener(restApiContext)
 
 	printAPIsInfo(restApiContext)
 
@@ -66,10 +67,11 @@ func restCmdExecute(cmd *cobra.Command, args []string) {
 	go serveSwaggerDocs(pexit, restApiContext)
 
 	reader := bufio.NewReader(os.Stdin)
-	r, _, _ := reader.ReadRune()
-	fmt.Print(r)
+	reader.ReadRune()
 
 	pexit <- true //kills swagger.exe process
+
+	fmt.Print("apic terminating...")
 }
 
 func createApis(cmd *cobra.Command) (RestApiContext) {
@@ -88,31 +90,32 @@ func createApis(cmd *cobra.Command) (RestApiContext) {
 	restApiContext.configPath = configPath
 
 	if configPath != "" {
-		restApiContext.RestApis = readConfigFileCmds(configPath)
+		restApiContext.RestApis = createApisFromConfigFile(configPath)
 	} else {
-		restApiContext.RestApis = readCliCmd(cmd)
+		restApiContext.RestApis = createApiFromCli(cmd)
 	}
 
 	return restApiContext
 }
 
-func readCliCmd(cmd *cobra.Command) ([]RestApi) {
+func createApiFromCli(cmd *cobra.Command) ([]RestApi) {
 
 	apis := []RestApi{}
 
 	api := newRestApi()
 	api.Path = cmd.Flags().Arg(0)
+	
 	if api.Path == "" {
 		api.Path = defaultRestPath
 	} else {
-		api.Path =  formatAPIPath(strings.TrimSpace(api.Path))
+		api.Path =  formatAPIPath(api.Path)
 	}
 
 	cmd.Flags().Visit(func(f *pflag.Flag) {
 
 		switch f.Name {
 			case "querystr":
-				api.Querystring = strings.TrimSpace(f.Value.String())
+				api.Querystring = formatQueryStr(f.Value.String())
 			case "resp":
 				api.Resp = f.Value.String()
 			case "header":
@@ -129,7 +132,7 @@ func readCliCmd(cmd *cobra.Command) ([]RestApi) {
 	return apis
 }
 
-func readConfigFileCmds(configPath string) ([]RestApi) {
+func createApisFromConfigFile(configPath string) ([]RestApi) {
 
 	//TODO: log err
 	fmt.Println(configPath)
@@ -141,7 +144,15 @@ func readConfigFileCmds(configPath string) ([]RestApi) {
 	return nil
 }
 
-func createRest(apiContext RestApiContext) {
+// func newApi(path string, qs string, resp string, headers string, cookies string) {
+
+	
+	
+
+	
+// }
+
+func initApiListener(apiContext RestApiContext) {
 
 	r := mux.NewRouter()
 
@@ -194,6 +205,27 @@ func getApiPath(args []string) string {
 		return args[0]
 	} else {
 		return "/api/new"
+	}
+}
+
+func formatAPIPath(path string) (string) {
+	var newPath string
+	newPath = strings.TrimSpace(path)
+
+	if fc := newPath[0:1]; fc != "/" {
+		newPath = "/" + newPath
+	}
+
+	return newPath
+}
+
+func formatQueryStr(qs string) (string) {
+
+	fqs := url.QueryEscape(strings.TrimSpace(qs))
+	if string(qs[0]) != "?" {
+		return "?" + fqs
+	} else {
+		return fqs
 	}
 }
 
