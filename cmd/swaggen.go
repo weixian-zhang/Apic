@@ -15,7 +15,7 @@ import (
 )
 
 var swaggerPath string
-const apicLinuxTempPath string = "/tmp/apic"
+const apicLinuxTempPath string = "/goswagger"
 var apicWinTempPath string = filepath.Join(os.Getenv("APPDATA"), "apic")
 var swaggerTempPath string
 var swaggerExeTempPath string = filepath.Join(apicWinTempPath, "swagger.exe")
@@ -36,8 +36,6 @@ func initExeYmlSwagPath() {
 	swaggerTempPath = swaggerPath
 	swaggerExeTempPath = filepath.Join(swaggerTempPath, "swagger.exe")
 	swaggerYmlTempPath = filepath.Join(swaggerTempPath, "gotemplate-swagger.yml")
-
-
 }
 
 func serveSwaggerDocs(pexit chan bool, apiContext RestApiContext) (error) {
