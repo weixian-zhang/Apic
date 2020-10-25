@@ -5,7 +5,7 @@ Apic is a CLI tool that mocks Restful APIs with customizable Path, QueryString, 
 #### Installation
 
 * Windows  
-[Download apic.exe](shorturl.at/asGN5)
+[Download apic.exe](https://shorturl.at/asGN5)
 
 * Linux  
   Coming soon...
