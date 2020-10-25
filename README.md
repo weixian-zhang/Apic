@@ -1,6 +1,6 @@
 #### What is APIC
 
-Apic is cli tool that mocks Restful APIs with custom Path, QueryString, Response, Headers, Cookies, and serves Swagger docs for mocked APIs.  
+Apic is a CLI tool that mocks Restful APIs with customizable Path, QueryString, Response, Headers, Cookies, and serves Swagger docs for your custom APIs.  
 
 #### Installation
 
