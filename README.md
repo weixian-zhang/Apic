@@ -4,7 +4,7 @@ Apic is cli tool that mocks Restful APIs with custom Path, QueryString, Response
 
 #### Installation
 
-* Windows
+* Windows  
 [Download apic.exe](shorturl.at/asGN5)
 
 * Linux
@@ -20,4 +20,6 @@ Apic is cli tool that mocks Restful APIs with custom Path, QueryString, Response
   
  * Basic usage: `apic rest`
  * Custom Api and Swagger port: `apic rest -p 8071 --swaggerport 8072`
- * Custom response: `apic rest -p 8071 --swaggerport 8072 -r {\"userName\":\"weixian\"}`
+ * Custom response: `apic rest -p 8071 --swaggerport 8072 -r {\"userName\":\"weixian\"}`  
+ 
+ * Run in Docker: `docker run --rm -p 8071:8071 -p 8072:8072 wxzd/apic:alpine-0.9 /app/apic rest -p 8071 --swaggerport 8072`
