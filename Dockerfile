@@ -38,4 +38,4 @@ COPY --from=build_base /app/out/goswagger /app
 COPY --from=build_base /app/out/apic /app
 
 # Run the binary program produced by `go install`
-CMD ["/apic"]
+CMD ["/app/apic"]

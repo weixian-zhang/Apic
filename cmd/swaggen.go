@@ -15,7 +15,7 @@ import (
 )
 
 var swaggerPath string
-const apicLinuxTempPath string = "/goswagger"
+const apicLinuxTempPath string = "/app"
 var apicWinTempPath string = filepath.Join(os.Getenv("APPDATA"), "apic")
 var swaggerTempPath string
 var swaggerExeTempPath string = filepath.Join(apicWinTempPath, "swagger.exe")
@@ -29,13 +29,13 @@ var box *packr.Box
 func initExeYmlSwagPath() {
 	if runtime.GOOS == "windows" {
 		swaggerPath = apicWinTempPath
+		swaggerExeTempPath = filepath.Join(swaggerPath, "swagger.exe")
 	} else {
 		swaggerPath = apicLinuxTempPath
+		swaggerExeTempPath = filepath.Join(swaggerPath, "goswagger")
 	}
 
-	swaggerTempPath = swaggerPath
-	swaggerExeTempPath = filepath.Join(swaggerTempPath, "swagger.exe")
-	swaggerYmlTempPath = filepath.Join(swaggerTempPath, "gotemplate-swagger.yml")
+	swaggerYmlTempPath = filepath.Join(swaggerPath, "gotemplate-swagger.yml")
 }
 
 func serveSwaggerDocs(pexit chan bool, apiContext RestApiContext) (error) {
@@ -108,8 +108,7 @@ func execSwagger(pexit chan bool, apiContext RestApiContext) (error) {
 		fmt.Println(werr)
 	}
 
-	swagexecCmd := exec.Command(swaggerExeTempPath, "serve", "-p", apiContext.swaggerPort, "-F=swagger", swaggerYmlTempPath)
-	//swagexecCmd.Dir = swaggerPath
+	swagexecCmd := exec.Command(swaggerExeTempPath, "serve", "-p", apiContext.swaggerPort, "--no-open", "-F=swagger", swaggerYmlTempPath)
 
 	var out bytes.Buffer
 	var stderr bytes.Buffer
@@ -122,9 +121,6 @@ func execSwagger(pexit chan bool, apiContext RestApiContext) (error) {
 		fmt.Println("swagstart: " + fmt.Sprint(serr.Error()) + ": " + stderr.String())
 		return serr
 	}
-
-	// printInfo(os.Getenv("PATH"))
-	// printInfo(swagexecCmd.String())
 
 	go func() {
 		//for {
