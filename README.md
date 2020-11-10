@@ -5,10 +5,10 @@ Apic is a CLI tool that mocks Restful APIs with customizable Path, QueryString, 
 #### Installation
 
 * Windows  
-[Download apic.exe](https://shorturl.at/asGN5)
+[Download apic.exe](https://strgapic.blob.core.windows.net/apic/win/apic.exe)
 
 * Linux  
-  curl https://shorturl.at/sEFMN
+  curl https://strgapic.blob.core.windows.net/apic/linux/apic
 
 * Docker  
   [docker pull wxzd/apic:alpine-0.9](https://hub.docker.com/repository/registry-1.docker.io/wxzd/apic/tags?page=1)
