@@ -11,7 +11,7 @@ Apic is a CLI tool that mocks Restful APIs with customizable Path, QueryString, 
   curl https://strgapic.blob.core.windows.net/apic/linux/apic
 
 * Docker  
-  [docker pull wxzd/apic:alpine-0.9](https://hub.docker.com/repository/registry-1.docker.io/wxzd/apic/tags?page=1)
+  [docker run wxzd/apic:alpine-0.9 /app/apic rest](https://hub.docker.com/repository/registry-1.docker.io/wxzd/apic/tags?page=1)
 
 
 * Kubernetes  
